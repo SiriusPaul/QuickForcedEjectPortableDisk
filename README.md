@@ -14,7 +14,7 @@ A lightweight Windows GUI utility (Python + PowerShell + diskpart) to enumerate 
 - Basic Shell COM eject attempt
 - Debug log (core/disk_query_debug.log)
 - Auto elevation (UAC)
-- 启发式外接磁盘识别（USB / Removable / External / USBSTOR / DriveType=2）
+- 外接磁盘识别（USB / Removable / External / USBSTOR / DriveType=2）
 - 脱机→联机（diskpart）
 - 基础 Shell COM 弹出尝试
 - 调试日志（core/disk_query_debug.log）
@@ -38,12 +38,12 @@ If UAC prompts, allow elevation.
 
 ---
 ## Usage / 使用说明
-1. Refresh disk list ("刷新磁盘").
+1. Refresh disk list ("刷新磁盘")(optional).
 2. Select target disk.
 3. Click "脱机->联机" to release abnormal locks.
 4. Click "弹出" to attempt eject.
 5. Check log panel.
-1. 点“刷新磁盘”
+1. 点“刷新磁盘”，初始已经加载。
 2. 选中磁盘
 3. 点“脱机->联机”释放占用
 4. 点“弹出”尝试逻辑弹出
@@ -54,7 +54,7 @@ If UAC prompts, allow elevation.
 Offline can cause data loss if writes are pending.
 脱机可能造成未完成写入丢失。
 Tool does not guarantee hardware safe removal.
-本工具不��证硬件级安全移除。
+本工具不保证硬件级安全移除。
 
 ---
 ## Directory / 目录
@@ -78,6 +78,7 @@ English: Match if any of: InterfaceType=USB, MediaType has REMOVABLE/EXTERNAL, a
 4. UI enhancements (icons/tags) · 界面增强
 5. Log export · 日志导出
 6. Cross-platform (Linux/macOS) · 跨平台支持
+7. Multi-language · 多语言支持
 
 ---
 ## Limitations / 已知限制
