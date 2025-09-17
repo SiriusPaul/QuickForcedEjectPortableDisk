@@ -11,13 +11,14 @@ class DiskInfo:
     model: str
     size: int  # bytes
     letters: List[str]
+    is_external: bool  # 新增：是否判定为外接/可移动
 
 _POWERSHELL = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
 _cache: List[DiskInfo] = []
 
 _DEBUG_LOG_PATH = os.path.join(os.path.dirname(__file__), 'disk_query_debug.log')
 
-# ---------------- Debug 辅助 ----------------
+# ---------------- Debug assist ----------------
 
 def _debug_enabled() -> bool:
     return bool(os.environ.get('QFE_DEBUG'))
@@ -92,7 +93,7 @@ def _collect_logical_drive_types() -> Dict[str, int]:
 
 # ---------------- 主查询逻辑 ----------------
 
-def query_disks(refresh: bool = True) -> List[DiskInfo]:
+def query_disks(refresh: bool = True, show_all: bool = False) -> List[DiskInfo]:
     global _cache
     if not refresh and _cache:
         return _cache
@@ -134,30 +135,22 @@ def query_disks(refresh: bool = True) -> List[DiskInfo]:
         media = (d.get('MediaType') or '').upper()
         pnp = (d.get('PNPDeviceID') or '').upper()
         has_removable_letter = any(l in removable_letters for l in letters)
-        # 新增判定：PNPDeviceID 包含 USBSTOR；MediaType 包含 EXTERNAL
         pnp_usb = 'USBSTOR' in pnp or ('USB' in pnp)
         media_external = 'EXTERNAL' in media
-        condition = (
-            ('USB' in interface) or
-            ('REMOVABLE' in media) or
-            has_removable_letter or
-            pnp_usb or
-            media_external
-        )
+        is_external = (('USB' in interface) or ('REMOVABLE' in media) or has_removable_letter or pnp_usb or media_external)
+        cond = is_external
         _dbg(
-            f"Disk idx={idx} interface={interface} media={media} pnp={pnp} letters={letters} has_removable_letter={has_removable_letter} pnp_usb={pnp_usb} media_external={media_external} cond={condition}"
+            f"Disk idx={idx} interface={interface} media={media} letters={letters} has_removable_letter={has_removable_letter} pnp_usb={pnp_usb} media_external={media_external} is_external={is_external}"
         )
-        if not condition:
-            continue
-        result.append(DiskInfo(
-            index=idx,
-            model=d.get('Model') or '',
-            size=int(d.get('Size') or 0),
-            letters=letters
-        ))
-    # 如果仍然没有结果，回退：显示所有带盘符且不是系统盘 C 的磁盘
-    if not result:
-        _dbg("No disk matched filters, fallback to showing all disks with letters (excluding system C) ...")
+        if show_all:
+            result.append(DiskInfo(index=idx, model=d.get('Model') or '', size=int(d.get('Size') or 0), letters=letters, is_external=is_external))
+        else:
+            if cond:
+                result.append(DiskInfo(index=idx, model=d.get('Model') or '', size=int(d.get('Size') or 0), letters=letters, is_external=is_external))
+
+    # 仅在非 show_all 且结果为空时，做一次回退（排除典型系统盘）
+    if not show_all and not result:
+        _dbg("No disk matched filters, fallback to showing all disks with letters (excluding system-like)")
         for d in disks_raw:
             idx = d.get('Index')
             if idx is None:
@@ -165,17 +158,13 @@ def query_disks(refresh: bool = True) -> List[DiskInfo]:
             letters = disk_letter_map.get(int(idx), [])
             if not letters:
                 continue
-            # 排除只有 C 的系统盘
-            if letters == ['C'] or letters == ['C', 'D'] and len(letters) <= 2:
-                # Heuristic: 跳过典型系统盘组合，可按需放宽
+            # 简单排除：仅 C 或 C,D 的典型系统盘组合
+            if letters == ['C'] or (letters == ['C', 'D'] and len(letters) <= 2):
                 continue
-            result.append(DiskInfo(
-                index=int(idx),
-                model=d.get('Model') or '',
-                size=int(d.get('Size') or 0),
-                letters=letters
-            ))
+            # 标注 is_external=False（回退视为内置）
+            result.append(DiskInfo(index=int(idx), model=d.get('Model') or '', size=int(d.get('Size') or 0), letters=letters, is_external=False))
         _dbg(f"Fallback result count={len(result)}")
+
     _cache = result
     _dbg(f"Final visible disks count={len(result)} -> {result}")
     return result

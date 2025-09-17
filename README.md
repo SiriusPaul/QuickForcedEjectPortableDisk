@@ -3,8 +3,15 @@
 English | 简体中文
 
 ---
+## Background / 背景
+When using "Safely Remove Hardware and Eject Media", Windows may report "The device is currently in use" even if no files are open. This can be due to background processes or system services holding locks on the drive, preventing safe removal. While one can use Event Viewer to find applications occupying the disk, blindly terminating system-level processes may lead to system crashes. A simple solution is to perform an "Offline→Online" operation on the drive to release abnormal locks. However, for Windows 10/11 Home users, the "Disk" utility does not support offline operations, necessitating the use of the diskpart command-line tool, which is less convenient. This tool aims to simplify these steps.
+
+使用“安全删除硬件并弹出媒体”时，Windows 可能会提示“设备当前正在使用中”，即使没有打开任何文件。这可能是由于后台进程或系统服务对驱动器持有锁定，阻止安全移除。固然可以通过事件查看器来查找占用磁盘的应用，但是如果是系统级别的进程，盲目中止可能会导致系统崩溃。一个简单的解决方案是对硬盘执行“脱机→联机”操作，释放异常占用。但是对于Windows 10/11家庭版用户，无法使用“磁盘”进行脱机操作，因此需要借助diskpart命令行工具，较为不便，本工具旨在简化这些步骤。
+
+---
 ## Overview / 项目简介
 A lightweight Windows GUI utility (Python + PowerShell + diskpart) to enumerate external/removable disks, run an Offline→Online cycle to release abnormal locks, and attempt logical eject.
+
 一个基于 Python + PowerShell + diskpart 的 Windows 图形工具，用于枚举外接/可移动磁盘，执行“脱机→联机”释放异常占用，并尝试逻辑弹出。
 
 ---
@@ -43,6 +50,7 @@ If UAC prompts, allow elevation.
 3. Click "脱机->联机" to release abnormal locks.
 4. Click "多策略弹出" to perform multi‑strategy eject.
 5. Check log panel.
+---
 1. 点“刷新磁盘”（初次已加载可选）
 2. 选中目标磁盘
 3. 点“脱机->联机”释放异常占用
@@ -101,6 +109,7 @@ Tool does not guarantee hardware safe removal.
 ---
 ## Detection Logic / 识别逻辑
 Match if any: InterfaceType=USB, MediaType has REMOVABLE/EXTERNAL, DriveType=2 logical volume, PNPDeviceID contains USBSTOR/USB; else fallback to non‑system disks.
+
 判定条件任一满足：InterfaceType=USB；MediaType 含 REMOVABLE/EXTERNAL；逻辑卷 DriveType=2；PNPDeviceID 含 USBSTOR/USB；否则回退显示非系统盘。
 
 ---
