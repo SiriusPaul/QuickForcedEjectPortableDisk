@@ -20,7 +20,7 @@ _DEBUG_LOG_PATH = os.path.join(os.path.dirname(__file__), 'disk_query_debug.log'
 # ---------------- Debug 辅助 ----------------
 
 def _debug_enabled() -> bool:
-    return True#bool(os.environ.get('QFE_DEBUG'))
+    return bool(os.environ.get('QFE_DEBUG'))
 
 def _dbg(msg: str):
     if not _debug_enabled():
