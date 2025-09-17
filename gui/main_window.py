@@ -9,6 +9,7 @@ class MainWindow:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.show_all_var = tk.BooleanVar(value=False)  # 新增：显示所有磁盘
+        self.refreshing = False  # 正在刷新标记
         self._build_ui()
         self.refresh_disks()
 
@@ -50,7 +51,40 @@ class MainWindow:
         self.status = tk.StringVar(value='就绪')
         ttk.Label(self.root, textvariable=self.status, anchor='w').pack(fill='x', padx=8, pady=(0,4))
 
+    # 新增：统一按钮可用性设置（在刷新时禁用，结束后恢复）
+    def _set_global_enabled(self, enabled: bool):
+        widgets = [self.btn_offline, self.btn_online, self.btn_off_on, self.btn_eject]
+        # 复选框本身也需要找到：遍历其父容器
+        for child in self.root.winfo_children():
+            pass
+        state = 'normal' if enabled else 'disabled'
+        # 复选框本身
+        # 通过 children 搜索文本匹配（简单方式）
+        # 也可以在创建时保存引用，这里简化不强引用
+        for w in self.root.children.values():
+            # 跳过
+            pass
+        # 直接遍历顶部 frame 的子元素
+        for child in self.root.winfo_children():
+            if isinstance(child, ttk.Frame):
+                for c in child.winfo_children():
+                    try:
+                        c['state'] = state
+                    except Exception:
+                        pass
+        # 单独处理文本框避免被禁用
+        try:
+            self.txt_log['state'] = 'normal'
+        except Exception:
+            pass
+        if enabled:
+            self._update_actions_state()
+
     def _update_actions_state(self, _evt=None):
+        if self.refreshing:
+            for btn in (self.btn_offline, self.btn_online, self.btn_off_on, self.btn_eject):
+                btn.state(['disabled'])
+            return
         disk = self._get_selected_disk(show_message=False)
         enable = bool(disk and disk.is_external)
         state = 'normal' if enable else 'disabled'
@@ -62,19 +96,40 @@ class MainWindow:
         self.txt_log.see('end')
 
     def refresh_disks(self):
-        try:
-            disks = disk_query.query_disks(refresh=True, show_all=self.show_all_var.get())
-        except Exception as e:
-            messagebox.showerror('错误', str(e))
+        if self.refreshing:
             return
-        for i in self.tree.get_children():
-            self.tree.delete(i)
-        for d in disks:
-            size_gb = d.size / (1024**3) if d.size else 0
-            dtype = '外接' if getattr(d, 'is_external', False) else '内置'
-            self.tree.insert('', 'end', iid=str(d.index), values=(d.index, d.model, ','.join(d.letters), f"{size_gb:.1f}", dtype))
-        self.log('刷新磁盘完成')
-        self._update_actions_state()
+        show_all = self.show_all_var.get()
+        self.refreshing = True
+        self.status.set('刷新中...')
+        self.log('正在刷新磁盘...')
+        self._set_global_enabled(False)
+
+        def worker():
+            try:
+                disks = disk_query.query_disks(refresh=True, show_all=show_all)
+                err = None
+            except Exception as e:
+                disks = []
+                err = e
+            # 回到主线程更新
+            def apply():
+                try:
+                    for i in self.tree.get_children():
+                        self.tree.delete(i)
+                    for d in disks:
+                        size_gb = d.size / (1024**3) if d.size else 0
+                        dtype = '外接' if getattr(d, 'is_external', False) else '内置'
+                        self.tree.insert('', 'end', iid=str(d.index), values=(d.index, d.model, ','.join(d.letters), f"{size_gb:.1f}", dtype))
+                    if err:
+                        messagebox.showerror('错误', str(err))
+                    else:
+                        self.log('刷新磁盘完成')
+                finally:
+                    self.refreshing = False
+                    self.status.set('就绪')
+                    self._set_global_enabled(True)
+            self.root.after(0, apply)
+        threading.Thread(target=worker, daemon=True).start()
 
     def _selected_index(self):
         sel = self.tree.selection()
@@ -201,12 +256,12 @@ class MainWindow:
         repo_url = 'https://github.com/SiriusPaul/QuickForcedEjectPortableDisk'
         msg = (
             '使用说明:\n'
-            '1) 选择上方表格中的目标磁盘。\n'
+            '1) 选择上方表格中的目标磁盘。（默认只显示移动磁盘）\n'
             '2) 可点击“脱机->联机”快速释放异常占用；\n'
             '   若仍然无法弹出，可多试几次，或使用“脱机”将磁盘暂时离线；点击“联机”恢复；\n'
             '3) “多策略弹出”会尝试 Shell 弹出/卷卸载/PNP 移除/离线等步骤；\n'
             '4) 勾选“显示所有磁盘”可查看内置盘，但已禁止对内置盘执行危险操作。\n\n'
-            'Tips (EN): Select a disk, use Offline/Online, or Offline→Online to release locks.\n'
+            'Tips (EN): Select a disk(only portable disks are shown by default), use Offline/Online, or Offline→Online to release locks.\n'
             'Multi-strategy Eject tries Shell/Volume/PnP/Offline in order.\n\n'
             '若该工具对您有用，可以为该项目点个 star，谢谢！\n'
             'If this tool is helpful to you, please star it on GitHub. Thanks!\n'
