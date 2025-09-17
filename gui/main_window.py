@@ -14,9 +14,8 @@ class MainWindow:
         frm_top = ttk.Frame(self.root)
         frm_top.pack(fill='x', padx=8, pady=4)
         ttk.Button(frm_top, text='刷新磁盘', command=self.refresh_disks).pack(side='left')
-        # ...existing code...
         ttk.Button(frm_top, text='脱机->联机', command=self.offline_online).pack(side='left', padx=6)
-        ttk.Button(frm_top, text='弹出', command=self.eject_selected).pack(side='left', padx=6)
+        ttk.Button(frm_top, text='多策略弹出', command=self.eject_selected).pack(side='left', padx=6)
 
         self.tree = ttk.Treeview(self.root, columns=('index', 'model', 'letters', 'size'), show='headings', height=8)
         self.tree.heading('index', text='索引')
@@ -70,7 +69,12 @@ class MainWindow:
                 self.log(out)
             except Exception as e:
                 self.log(f'错误: {e}')
-            self.status.set('就绪')
+            finally:
+                try:
+                    self.refresh_disks()
+                except Exception:
+                    pass
+                self.status.set('就绪')
         threading.Thread(target=task, daemon=True).start()
 
     def eject_selected(self):
@@ -80,13 +84,27 @@ class MainWindow:
         disk = disk_query.find_disk_by_index(idx)
         if not disk:
             return
+        if not messagebox.askyesno('确认', '多策略弹出可能会将磁盘离线或移除，请确认已保存数据。继续?'):
+            return
         def task():
-            self.status.set('尝试弹出...')
-            ok = eject.eject_letters(disk.letters)
-            if ok:
-                self.log('弹出指令已发送')
-            else:
-                self.log('无法确认弹出成功，可能设备不支持或仍被占用')
-            self.status.set('就绪')
+            self.status.set('多策略弹出中...')
+            try:
+                result = eject.eject_disk(disk.index, disk.letters)
+                self.log(f"[弹出结果] success={result['success']} stage={result['stage']}")
+                for line in result.get('details', []):
+                    self.log(line)
+                if result['stage'] == 'disk_offline':
+                    self.log('磁盘已离线，可尝试物理拔出。若需恢复，可使用“脱机->联机”重新上线。')
+                elif result['stage'] == 'pnp_remove':
+                    self.log('PnP 设备已请求移除，若盘符已消失可安全拔出。')
+                elif not result['success']:
+                    self.log('所有策略未成功，可尝试手动在资源管理器中“安全移除硬件”。')
+            except Exception as e:
+                self.log(f'弹出执行错误: {e}')
+            finally:
+                try:
+                    self.refresh_disks()
+                except Exception:
+                    pass
+                self.status.set('就绪')
         threading.Thread(target=task, daemon=True).start()
-
