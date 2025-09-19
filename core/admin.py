@@ -11,11 +11,15 @@ def is_admin() -> bool:
 
 
 def relaunch_as_admin(extra_args: Optional[list] = None):
-    # 重启自身并请求管理员权限
+    """以管理员重新启动自身。
+    通过 ShellExecuteW("runas") 触发 UAC。将 showCmd 设为 0 以减少启动瞬间黑框/窗口闪烁。
+    注意: UAC 提示本身无法被隐藏。
+    """
     params = ' '.join([f'"{a}"' for a in sys.argv])
     if extra_args:
         params += ' ' + ' '.join(extra_args)
-    ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, params, None, 1)
+    # 第 6 个参数 showCmd: 0=SW_HIDE 之前是 1(正常显示)
+    ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, params, None, 0)
 
 
 def ensure_admin() -> bool:
@@ -30,4 +34,3 @@ def ensure_admin() -> bool:
         return True
     relaunch_as_admin(["--elevated"])
     return False
-
