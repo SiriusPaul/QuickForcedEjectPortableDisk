@@ -8,7 +8,8 @@ import os
 
 block_cipher = None
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+# 注意: 在 spec 执行环境中 __file__ 未定义，使用工作目录推导
+BASE_DIR = os.path.abspath(os.getcwd())
 ICON_PATH = os.path.join(BASE_DIR, 'logo.ico')
 DATAS = []
 if os.path.exists(ICON_PATH):
