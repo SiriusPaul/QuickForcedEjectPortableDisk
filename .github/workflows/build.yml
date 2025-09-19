@@ -8,9 +8,17 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+        python-version: ['3.12']
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,8 +26,9 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
+          cache-dependency-path: requirements.txt
 
       - name: Install build tools
         shell: pwsh
@@ -35,26 +44,31 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: QuickPortableDiskTool-windows
+          name: QuickPortableDiskTool-${{ matrix.os }}
           path: dist/QuickPortableDiskTool.exe
           if-no-files-found: error
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
-      - name: Download artifact
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: QuickPortableDiskTool-windows
+          pattern: QuickPortableDiskTool-*
+          merge-multiple: true
           path: dist
+
+      - name: List artifacts
+        shell: pwsh
+        run: Get-ChildItem -Recurse dist | Format-List
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/QuickPortableDiskTool.exe
+            dist/**/QuickPortableDiskTool.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
