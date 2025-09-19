@@ -4,14 +4,22 @@
 # 若需要目录模式(启动更快)删除 one-file 风格: 可改用命令行 pyinstaller app.spec --onedir 或调整为含 COLLECT 段。
 # 如需管理员权限启动, 可自行创建 manifest.xml, 然后在 EXE(...) 里加 manifest='manifest.xml'
 
+import os
+
 block_cipher = None
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+ICON_PATH = os.path.join(BASE_DIR, 'logo.ico')
+DATAS = []
+if os.path.exists(ICON_PATH):
+    DATAS.append((ICON_PATH, '.'))
 
 
 a = Analysis(
     ['app.py'],
-    pathex=[],
+    pathex=[BASE_DIR],
     binaries=[],
-    datas=[('logo.ico', '.')],  # 运行期若需访问原始图标放入同目录
+    datas=DATAS,  # 运行期若需访问原始图标放入同目录
     hiddenimports=[],            # 如打包后缺模块, 将模块名追加到此列表
     hookspath=[],
     hooksconfig={},
@@ -34,7 +42,7 @@ exe = EXE(
     a.datas,
     [],
     name='QuickPortableDiskTool',
-    icon='logo.ico',
+    icon=ICON_PATH if os.path.exists(ICON_PATH) else None,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -49,4 +57,3 @@ exe = EXE(
     entitlements_file=None,
     # manifest='manifest.xml',  # 需要管理员权限时取消注释并提供 manifest 文件
 )
-
