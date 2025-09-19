@@ -1,12 +1,34 @@
 import subprocess
 import shutil
 from typing import List, Dict, Any
+from . import diskpart_ops  # 新增：用于兜底离线磁盘
+
+# 统一的子进程隐藏窗口配置（Windows）
+try:
+    from subprocess import STARTUPINFO, STARTF_USESHOWWINDOW  # type: ignore
+    _HAS_STARTUPINFO = True
+except Exception:  # pragma: no cover
+    _HAS_STARTUPINFO = False
+
+_CREATE_NO_WINDOW = 0x08000000
+
+
+def _run_hidden(cmd: List[str], **kwargs) -> subprocess.CompletedProcess:
+    startupinfo = None
+    creationflags = kwargs.pop('creationflags', 0)
+    if _HAS_STARTUPINFO:
+        startupinfo = STARTUPINFO()
+        startupinfo.dwFlags |= STARTF_USESHOWWINDOW  # type: ignore[attr-defined]
+    if subprocess._mswindows:  # type: ignore[attr-defined]
+        creationflags |= _CREATE_NO_WINDOW
+    return subprocess.run(cmd, startupinfo=startupinfo, creationflags=creationflags, **kwargs)
+
 
 _PS_BASE = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
 
 
 def _run_ps(script: str) -> subprocess.CompletedProcess:
-    return subprocess.run(_PS_BASE + [script], capture_output=True, text=True)
+    return _run_hidden(_PS_BASE + [script], capture_output=True, text=True)
 
 # ---------------- 基础检测 ----------------
 
@@ -60,7 +82,7 @@ def _has_invoke_pnp() -> bool:
 def _pnp_remove(disk_index: int, details: List[str]) -> bool:
     pnp_id = _get_pnp_id(disk_index)
     if not pnp_id:
-        details.append("未获取到 PNPDeviceID，跳过 PnP 移除")
+        details.append("未获取��� PNPDeviceID，跳过 PnP 移除")
         return False
     # 转义反斜杠
     esc = pnp_id.replace('\\', '\\\\').replace('"', '\"')
@@ -85,7 +107,7 @@ def _pnp_remove(disk_index: int, details: List[str]) -> bool:
     # 2) pnputil /remove-device （Windows 10 1903+）
     if shutil.which('pnputil'):
         cmd = ["pnputil", "/remove-device", pnp_id]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = _run_hidden(cmd, capture_output=True, text=True)
         if r.returncode == 0:
             # 再检测是否仍存在
             verify = _run_ps(f"if(Get-CimInstance Win32_DiskDrive | Where-Object {{$_.PNPDeviceID -eq '{esc}'}}){{'PRESENT'}} else {{'REMOVED'}}")
@@ -101,7 +123,7 @@ def _pnp_remove(disk_index: int, details: List[str]) -> bool:
 
     # 3) devcon remove （可选 WDK 工具）
     if shutil.which('devcon'):
-        r = subprocess.run(["devcon", "remove", pnp_id], capture_output=True, text=True)
+        r = _run_hidden(["devcon", "remove", pnp_id], capture_output=True, text=True)
         if r.returncode == 0:
             verify = _run_ps(f"if(Get-CimInstance Win32_DiskDrive | Where-Object {{$_.PNPDeviceID -eq '{esc}'}}){{'PRESENT'}} else {{'REMOVED'}}")
             if 'REMOVED' in verify.stdout:
@@ -118,6 +140,16 @@ def _pnp_remove(disk_index: int, details: List[str]) -> bool:
     return success
 
 # ---------------- 统一对外接口 ----------------
+
+# 新增：兜底离线函数
+
+def _disk_offline(disk_index: int) -> bool:
+    try:
+        diskpart_ops.offline_disk(disk_index)
+        return True
+    except Exception:
+        return False
+
 
 def eject_disk(disk_index: int, letters: List[str]) -> Dict[str, Any]:
     """多策略弹出/卸载。返回 {success, stage, details[]} 顺序: Shell -> 卷卸载 -> PnP 移除 -> 离线"""
@@ -151,7 +183,7 @@ def eject_disk(disk_index: int, letters: List[str]) -> Dict[str, Any]:
 
     # 4. 磁盘离线兜底
     if _disk_offline(disk_index):
-        details.append("磁盘已离线 (只读+IsOffline=True)")
+        details.append("磁盘已离线")
         return {"success": True, "stage": "disk_offline", "details": details}
     else:
         details.append("磁盘离线失败或仍在线")

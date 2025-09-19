@@ -5,6 +5,31 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict, Tuple
 from datetime import datetime
 
+# Windows 隐藏子进程窗口配置
+try:
+    from subprocess import STARTUPINFO, STARTF_USESHOWWINDOW  # type: ignore
+    _HAS_STARTUPINFO = True
+except Exception:  # pragma: no cover
+    _HAS_STARTUPINFO = False
+
+_CREATE_NO_WINDOW = 0x08000000
+
+
+def _run_hidden(cmd: List[str], **kwargs) -> subprocess.CompletedProcess:
+    startupinfo = None
+    creationflags = kwargs.pop('creationflags', 0)
+    if _HAS_STARTUPINFO:
+        startupinfo = STARTUPINFO()
+        startupinfo.dwFlags |= STARTF_USESHOWWINDOW  # type: ignore[attr-defined]
+        startupinfo.wShowWindow = 0  # SW_HIDE
+    if subprocess._mswindows:  # type: ignore[attr-defined]
+        creationflags |= _CREATE_NO_WINDOW
+    return subprocess.run(cmd, startupinfo=startupinfo, creationflags=creationflags, **kwargs)
+
+# 固定 PowerShell 路径并隐藏窗口
+_PS_EXE = os.path.join(os.environ.get('SystemRoot', r'C:\Windows'), r'System32\WindowsPowerShell\v1.0\powershell.exe')
+_POWERSHELL = [_PS_EXE, '-NoProfile', '-NonInteractive', '-NoLogo', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-Command']
+
 @dataclass
 class DiskInfo:
     index: int
@@ -13,7 +38,6 @@ class DiskInfo:
     letters: List[str]
     is_external: bool  # 新增：是否判定为外接/可移动
 
-_POWERSHELL = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
 _cache: List[DiskInfo] = []
 
 _DEBUG_LOG_PATH = os.path.join(os.path.dirname(__file__), 'disk_query_debug.log')
@@ -40,7 +64,7 @@ def _dbg(msg: str):
 # ---------------- PowerShell 调用 ----------------
 
 def _run_ps_json(script: str):
-    proc = subprocess.run(_POWERSHELL + [script], capture_output=True, text=True)
+    proc = _run_hidden(_POWERSHELL + [script], capture_output=True, text=True)
     if proc.returncode != 0:
         stderr = proc.stderr.strip()
         stdout = proc.stdout.strip()
@@ -137,7 +161,7 @@ def query_disks(refresh: bool = True, show_all: bool = False) -> List[DiskInfo]:
         has_removable_letter = any(l in removable_letters for l in letters)
         pnp_usb = 'USBSTOR' in pnp or ('USB' in pnp)
         media_external = 'EXTERNAL' in media
-        is_external = (('USB' in interface) or ('REMOVABLE' in media) or has_removable_letter or pnp_usb or media_external)
+        is_external = (("USB" in interface) or ("REMOVABLE" in media) or has_removable_letter or pnp_usb or media_external)
         cond = is_external
         _dbg(
             f"Disk idx={idx} interface={interface} media={media} letters={letters} has_removable_letter={has_removable_letter} pnp_usb={pnp_usb} media_external={media_external} is_external={is_external}"
