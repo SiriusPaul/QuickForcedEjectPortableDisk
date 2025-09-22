@@ -60,7 +60,7 @@ python app.py
 
 ---
 ## 多策略弹出实现说明
-中文执行顺序：
+执行顺序：
 1. Shell COM 动作
    命令：Shell.Application NameSpace(17).ParseName('E:').InvokeVerb('Eject')
    成功：盘符消失 (Test-Path E:\ 为 false)
