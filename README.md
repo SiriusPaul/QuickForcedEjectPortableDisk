@@ -11,6 +11,13 @@
 一个基于 Python + PowerShell + diskpart 的 Windows 图形工具，用于枚举外接/可移动磁盘，执行“脱机→联机”释放异常占用，并尝试逻辑弹出。
 
 ---
+## 下载与使用（免安装 EXE）
+- 前往项目的 GitHub Releases 页面，下载最新的 QuickPortableDiskTool.exe
+- 直接双击运行；涉及磁盘操作，建议右键“以管理员身份运行”（首次会弹 UAC）
+- 首次可能触发 SmartScreen：点击“更多信息”→“仍要运行”
+- 无需安装 Python 或依赖，仅支持 Windows 10/11（x64）
+
+---
 ## 当前功能
 - 外接磁盘识别（USB / Removable / External / USBSTOR / DriveType=2）
 - 脱机→联机（diskpart）
@@ -20,10 +27,10 @@
 
 ---
 ## 运行环境
-适用 Windows 10/11 · Python 3.10+ · 脱机/联机需管理员权限
+适用 Windows 10/11 · 脱机/联机需管理员权限
 
 ---
-## 安装与运行
+## 从源码运行（可选）
 ```bash
 python -m venv venv
 venv\Scripts\activate
@@ -31,6 +38,17 @@ pip install -r requirements.txt
 python app.py
 ```
 若出现 UAC 提示请允许提权。
+
+---
+## 本地打包（可选）
+- 单文件（与 Release 一致）
+  pyinstaller --clean app.spec
+  产物：dist/QuickPortableDiskTool.exe
+- 目录模式（启动更快）
+  pyinstaller --clean --onedir app.spec
+  产物：dist/QuickPortableDiskTool/
+
+提示：若无 logo.ico，app.spec 会自动跳过图标，不影响构建。
 
 ---
 ## 使用说明
