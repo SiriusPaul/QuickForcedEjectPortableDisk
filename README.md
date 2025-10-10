@@ -4,7 +4,7 @@
 
 ---
 ## 背景
-使用“安全删除硬件并弹出媒体”时，Windows 可能会提示“设备当前正在���用中”，即使没有打开任���文件。这可能是由于后台进程或系统服务对驱动器持有锁定，阻止安全移除。固然可以通过事件查看器来查找占用磁盘的应用，但是如果是系统级别的进程，盲目中止可能会导致系统崩溃。一个简单的解决方案是对硬盘执行“脱机→联机”操作，释放异常占用。但是对于 Windows 10/11 家庭版用户，无法使用“磁盘”进行脱机操作，因此需要借助 diskpart 命令行工具，较为不便，本工具旨在简化这些步骤。
+使用“安全删除硬件并弹出媒体”时，Windows 可能会提示“设备当前正在使用中”，即使没有打开任何文件。这可能是由于后台进程或系统服务对驱动器持有锁定，阻止安全移除。固然可以通过事件查看器来查找占用磁盘的应用，但是如果是系统级别的进程，盲目中止可能会导致系统崩溃。一个简单的解决方案是对硬盘执行“脱机→联机”操作，释放异常占用。但是对于 Windows 10/11 家庭版用户，无法使用“磁盘”进行脱机操作，因此需要借助 diskpart 命令行工具，较为不便，本工具旨在简化这些步骤。
 
 ---
 ## 项目简介
@@ -40,17 +40,6 @@ python app.py
 若出现 UAC 提示请允许提权。
 
 ---
-## 本地打包（可选）
-- 单文件（与 Release 一致）
-  pyinstaller --clean app.spec
-  产物：dist/QuickPortableDiskTool.exe
-- 目录模式（启动更快）
-  pyinstaller --clean --onedir app.spec
-  产物：dist/QuickPortableDiskTool/
-
-提示：若无 logo.ico，app.spec 会自动跳过图标，不影响构建。
-
----
 ## 使用说明
 1. 点“刷新磁盘”（初次已加载可选）
 2. 选中目标磁盘
@@ -73,7 +62,7 @@ python app.py
    c) devcon remove <PNPDeviceID>（若已放置 devcon）
    成功：Win32_DiskDrive 不再包含该 PNPDeviceID
 4. 磁盘离线兜底
-   Set-Disk -Number N -IsReadOnly $true; Set-Disk -Number N -IsOffline $true
+   Set-Disk -Number N -IsReadOnly true; Set-Disk -Number N -IsOffline true
    成功：Get-Disk 显示 IsOffline=True（托盘可能仍显示）
 阶段返回：shell_com / volume_dismount / pnp_remove / disk_offline / all_failed
 
